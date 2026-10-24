@@ -1,0 +1,59 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Arrange source files into lib/
+        run: |
+          mkdir -p lib
+          mv main.dart app_state.dart strings.dart screens.dart lib/
+          ls -R lib
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Generate Android scaffold
+        run: |
+          flutter create --platforms=android --org com.riderhub --project-name riderhub /tmp/scaffold
+          rm -rf android
+          cp -r /tmp/scaffold/android ./android
+
+      - name: Set app name
+        run: sed -i 's/android:label="[^"]*"/android:label="RIDERHUB"/' android/app/src/main/AndroidManifest.xml
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Generate app icon
+        run: dart run flutter_launcher_icons
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: riderhub-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
